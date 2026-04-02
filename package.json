@@ -1,0 +1,13 @@
+﻿{
+  "name": "bot-bslt",
+  "version": "1.0.0",
+  "description": "Bot de barra de boosts para BSLT",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "express": "^4.18.2"
+  }
+}
