@@ -17,7 +17,8 @@ const client = new Client({
 });
 
 const CONFIG = {
-    TOKEN: 'MTQ4OTI5ODE2MzI4MTE2NjQ0OQ.Ge63q2.lnCujw4vsNLfPWc_zwDa9I4Fxb9gLSu-n8J-T8',
+    // Usamos process.env para que lea tu Secret de Replit y Discord no te bloquee el token
+    TOKEN: process.env.DISCORD_TOKEN,
     CLIENT_ID: '1489298163281166449',
     CANAL_BARRA_ID: '1489089313466613893',
     BOOSTS_ACTUALES: 18, 
@@ -106,6 +107,30 @@ client.on('interactionCreate', async interaction => {
 
         const texto = num >= CONFIG.META_NUEVA ? "🎊 ¡META COMPLETADA! @everyone" : "🎊 ¡Gracias por el Boost!";
         await interaction.editReply({ content: texto, embeds: [embedGracias] });
+    }
+});
+
+// --- ESTE ES EL NUEVO BLOQUE QUE ENVÍA EL AGRADECIMIENTO AL USUARIO ---
+client.on('guildMemberUpdate', async (oldMember, newMember) => {
+    // Detecta si el usuario no tenía boost y ahora sí lo tiene
+    if (!oldMember.premiumSince && newMember.premiumSince) {
+        const canal = await client.channels.fetch(CONFIG.CANAL_BARRA_ID);
+        const user = newMember.user;
+        
+        // Calcular el progreso para mostrar en el mensaje
+        const totalReal = newMember.guild.premiumSubscriptionCount || 0;
+        const num = Math.max(totalReal - CONFIG.BOOSTS_ACTUALES, 0);
+        const faltan = Math.max(CONFIG.META_NUEVA - num, 0);
+
+        const embedGracias = new EmbedBuilder()
+            .setTitle("💎 ¡Nuevo Boost Detectado!")
+            .setColor(0xFF73FA)
+            .setDescription(`¡Muchísimas gracias ${user} por mejorar el servidor!\n\nCon tu ayuda, llevamos **${num}/${CONFIG.META_NUEVA}** de la nueva meta.\n${faltan > 0 ? `¡Solo faltan **${faltan}** más! 🚀` : "¡Hemos completado la meta! 🎉"}`)
+            .setThumbnail(user.displayAvatarURL())
+            .setFooter({ text: "Gracias por apoyar a BSLT" });
+
+        const texto = num >= CONFIG.META_NUEVA ? "🎊 ¡META COMPLETADA! @everyone" : "🎊 ¡Gracias por el Boost!";
+        await canal.send({ content: texto, embeds: [embedGracias] });
     }
 });
 
