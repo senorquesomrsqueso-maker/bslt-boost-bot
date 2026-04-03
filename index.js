@@ -1,7 +1,7 @@
-﻿const { Client, GatewayIntentBits, EmbedBuilder, REST, Routes, SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+﻿const { Client, GatewayIntentBits, EmbedBuilder, REST, Routes, SlashCommandBuilder, MessageType } = require('discord.js');
 const express = require('express');
 
-// --- SERVIDOR PARA MANTENERLO VIVO 24/7 ---
+// --- SERVIDOR PARA MANTENERLO VIVO ---
 const app = express();
 app.get('/', (req, res) => res.send('BSLT Bot Online 🚀'));
 app.listen(process.env.PORT || 3000, () => console.log('✅ Servidor web activo'));
@@ -10,40 +10,39 @@ app.listen(process.env.PORT || 3000, () => console.log('✅ Servidor web activo'
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds, 
-        GatewayIntentBits.GuildPresences,
         GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessages, // Necesario para detectar los mensajes rosas del sistema
         GatewayIntentBits.MessageContent
     ]
 });
 
 const CONFIG = {
-    // Usamos process.env para que lea tu Secret de Replit y Discord no te bloquee el token
-    TOKEN: process.env.DISCORD_TOKEN,
+    TOKEN: process.env.DISCORD_TOKEN, // Recuerda tener tu token en los Secrets
     CLIENT_ID: '1489298163281166449',
     CANAL_BARRA_ID: '1489089313466613893',
     BOOSTS_ACTUALES: 18, 
-    META_NUEVA: 14,
-    MENSAJE_ID: null 
+    META_NUEVA: 14
 };
 
-// --- FUNCIÓN DE DISEÑO ---
+// --- FUNCIÓN DE DISEÑO Y LISTA RÁPIDA ---
 async function generarEmbedBoost(guild, forzado = null) {
     const totalReal = forzado !== null ? (CONFIG.BOOSTS_ACTUALES + forzado) : guild.premiumSubscriptionCount;
     const nuevosBoosts = Math.max(totalReal - CONFIG.BOOSTS_ACTUALES, 0);
     const porcentaje = Math.min(Math.floor((nuevosBoosts / CONFIG.META_NUEVA) * 100), 100);
     
-    const members = await guild.members.fetch({ time: 5000 }).catch(() => null);
-    const boostersList = members ? members
-        .filter(m => m.premiumSince)
+    // Carga la lista al instante (sin esperar)
+    const members = await guild.members.fetch();
+    const boostersList = members
+        .filter(m => m.premiumSince !== null)
         .map(m => `• **${m.user.username}**`)
-        .slice(0, 15)
-        .join('\n') : "Cargando...";
+        .slice(0, 15) // Muestra los primeros 15 para no saturar
+        .join('\n');
 
     let barra = "";
-    if (porcentaje < 25) barra = "【▓░░░░░░░░░】";
-    else if (porcentaje < 50) barra = "【▓▓▓░░░░░░░】";
-    else if (porcentaje < 75) barra = "【▓▓▓▓▓▓░░░░】";
-    else if (porcentaje < 100) barra = "【▓▓▓▓▓▓▓▓░░】";
+    if (porcentaje < 20) barra = "【▓░░░░░░░░░】";
+    else if (porcentaje < 40) barra = "【▓▓▓░░░░░░░】";
+    else if (porcentaje < 60) barra = "【▓▓▓▓▓░░░░░】";
+    else if (porcentaje < 80) barra = "【▓▓▓▓▓▓▓░░░】";
     else barra = "【▓▓▓▓▓▓▓▓▓▓】";
 
     const titulo = porcentaje >= 100 ? "✅ Meta de Mejoras: Completado" : "🚀 Meta de Mejoras: Fase II";
@@ -62,7 +61,7 @@ async function generarEmbedBoost(guild, forzado = null) {
     };
 }
 
-// --- COMANDOS ---
+// --- COMANDOS (SE MANTIENEN PARA QUE PUEDAS PROBAR) ---
 const commands = [
     new SlashCommandBuilder()
         .setName('probar-boosts')
@@ -110,18 +109,28 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-// --- ESTE ES EL NUEVO BLOQUE QUE ENVÍA EL AGRADECIMIENTO AL USUARIO ---
-client.on('guildMemberUpdate', async (oldMember, newMember) => {
-    // Detecta si el usuario no tenía boost y ahora sí lo tiene
-    if (!oldMember.premiumSince && newMember.premiumSince) {
+// --- EL NUEVO SISTEMA ININFALIBLE PARA DETECTAR BOOSTS ---
+// Ahora lee el mensaje del sistema (las letras rosadas) en el canal.
+// Así, si alguien da 2 boosts seguidos, el bot agradecerá los 2.
+client.on('messageCreate', async message => {
+    // Si el mensaje es un aviso del sistema de Discord informando de un Boost
+    const tiposDeBoost = [
+        MessageType.GuildBoost,
+        MessageType.GuildBoostTier1,
+        MessageType.GuildBoostTier2,
+        MessageType.GuildBoostTier3
+    ];
+
+    if (tiposDeBoost.includes(message.type)) {
         const canal = await client.channels.fetch(CONFIG.CANAL_BARRA_ID);
-        const user = newMember.user;
+        const user = message.author;
         
-        // Calcular el progreso para mostrar en el mensaje
-        const totalReal = newMember.guild.premiumSubscriptionCount || 0;
+        // Calcular números reales
+        const totalReal = message.guild.premiumSubscriptionCount || 0;
         const num = Math.max(totalReal - CONFIG.BOOSTS_ACTUALES, 0);
         const faltan = Math.max(CONFIG.META_NUEVA - num, 0);
 
+        // 1. Enviar el mensaje de agradecimiento
         const embedGracias = new EmbedBuilder()
             .setTitle("💎 ¡Nuevo Boost Detectado!")
             .setColor(0xFF73FA)
@@ -131,21 +140,10 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 
         const texto = num >= CONFIG.META_NUEVA ? "🎊 ¡META COMPLETADA! @everyone" : "🎊 ¡Gracias por el Boost!";
         await canal.send({ content: texto, embeds: [embedGracias] });
-    }
-});
 
-client.on('guildUpdate', async (oldG, newG) => {
-    if (newG.premiumSubscriptionCount > oldG.premiumSubscriptionCount) {
-        const canal = await client.channels.fetch(CONFIG.CANAL_BARRA_ID);
-        const dataBarra = await generarEmbedBoost(newG);
-        const mensajes = await canal.messages.fetch({ limit: 10 });
-        const msgPrincipal = mensajes.find(m => m.author.id === client.user.id);
-        if (msgPrincipal) await msgPrincipal.edit(dataBarra); else await canal.send(dataBarra);
-
-        const numActual = newG.premiumSubscriptionCount - CONFIG.BOOSTS_ACTUALES;
-        if (numActual >= CONFIG.META_NUEVA) {
-            await canal.send({ content: "📢 **¡OBJETIVO COMPLETADO!** @everyone" });
-        }
+        // 2. Enviar la barra de progreso en un MENSAJE NUEVO justo abajo
+        const dataBarra = await generarEmbedBoost(message.guild);
+        await canal.send(dataBarra);
     }
 });
 
