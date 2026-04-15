@@ -22,23 +22,23 @@ const client = new Client({
 
 const CONFIG = {
     TOKEN: process.env.DISCORD_TOKEN,
-    CLIENT_ID: '1489298163281166449', // Tu ID de bot
-    CANAL_AGRADECIMIENTOS_ID: '1489089313466613893' // Tu canal de boosts
+    CLIENT_ID: '1489298163281166449', // Asegúrate de que sea el correcto
+    CANAL_AGRADECIMIENTOS_ID: '1489089313466613893' // Canal donde el bot agradece
 };
 
 // ==========================================
-// 3. COMANDOS SLASH (/probar-agradecimiento y /tell)
+// 3. DEFINICIÓN DE COMANDOS SLASH
 // ==========================================
 const commands = [
     new SlashCommandBuilder()
-        .setName('probar-agradecimiento')
-        .setDescription('Simula el mensaje bonito de agradecimiento de boost'),
+        .setName('probar-boost')
+        .setDescription('Simula el mensaje de agradecimiento de boost'),
     new SlashCommandBuilder()
-        .setName('tell')
-        .setDescription('Hace que el bot envíe el mensaje que tú escribas')
+        .setName('msg')
+        .setDescription('El bot enviará el mensaje que escribas')
         .addStringOption(option => 
-            option.setName('mensaje')
-                .setDescription('El texto que el bot enviará al canal')
+            option.setName('texto')
+                .setDescription('Lo que quieres que diga el bot')
                 .setRequired(true)
         )
 ].map(c => c.toJSON());
@@ -49,18 +49,18 @@ client.on('ready', async () => {
     console.log(`✅ BSLT Bot conectado como ${client.user.tag}`);
     try {
         await rest.put(Routes.applicationCommands(CONFIG.CLIENT_ID), { body: commands });
-        console.log("✅ Comandos cargados correctamente.");
+        console.log("✅ Comandos /probar-boost y /msg cargados.");
     } catch (e) { console.error("Error cargando comandos:", e); }
 });
 
 // ==========================================
-// 4. RESPUESTA A LOS COMANDOS
+// 4. LÓGICA DE COMANDOS Y BOOSTS
 // ==========================================
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
-    // --- COMANDO: /probar-agradecimiento ---
-    if (interaction.commandName === 'probar-agradecimiento') {
+    // --- COMANDO /probar-boost ---
+    if (interaction.commandName === 'probar-boost') {
         const embedGracias = new EmbedBuilder()
             .setTitle("💎 ¡NUEVO BOOST DETECTADO! (Prueba)")
             .setColor(0xFF73FA)
@@ -71,21 +71,15 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: `🎉 ¡Gracias totales, ${interaction.user}!`, embeds: [embedGracias] });
     }
 
-    // --- COMANDO: /tell ---
-    if (interaction.commandName === 'tell') {
-        const mensajeTexto = interaction.options.getString('mensaje');
-        
-        // El bot envía el mensaje al canal donde ejecutaste el comando
-        await interaction.channel.send(mensajeTexto);
-        
-        // El bot te responde a ti de forma "efímera" (solo tú lo ves) para que no quede rastro del comando
-        await interaction.reply({ content: '✅ Mensaje enviado sigilosamente.', ephemeral: true });
+    // --- COMANDO /msg ---
+    if (interaction.commandName === 'msg') {
+        const texto = interaction.options.getString('texto');
+        await interaction.channel.send(texto);
+        await interaction.reply({ content: '✅ Mensaje enviado.', ephemeral: true });
     }
 });
 
-// ==========================================
-// 5. DETECTOR REAL DE BOOSTS (SIN BARRA)
-// ==========================================
+// --- DETECTOR DE BOOSTS (SIN BARRA) ---
 client.on('messageCreate', async message => {
     const tiposDeBoost = [
         MessageType.GuildBoost,
@@ -110,3 +104,4 @@ client.on('messageCreate', async message => {
 });
 
 client.login(CONFIG.TOKEN);
+    
