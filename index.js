@@ -104,4 +104,3 @@ client.on('messageCreate', async message => {
 });
 
 client.login(CONFIG.TOKEN);
-    
